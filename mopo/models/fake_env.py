@@ -90,7 +90,8 @@ class FakeEnv:
                 dists = np.linalg.norm(diffs, axis=2)   # distance in obs space
                 penalty = np.max(dists, axis=0)         # max distances over models
             else:
-                penalty = np.amax(np.linalg.norm(ensemble_model_stds, axis=2), axis=0)
+#                 penalty = np.amax(np.linalg.norm(ensemble_model_stds, axis=2), axis=0)
+                penalty = (1 + np.log(2*np.pi*(np.amax(np.linalg.norm(ensemble_model_stds, axis=2), axis=0)**2))) / 2
 
             penalty = np.expand_dims(penalty, 1)
             assert penalty.shape == rewards.shape
