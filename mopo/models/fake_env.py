@@ -1,17 +1,51 @@
 import numpy as np
 import tensorflow as tf
+import tensorflow_probability as tfp
 import pdb
+from numbers import Number
+
+def heuristic_target_entropy():
+    # TODO
+    return 1.0
 
 class FakeEnv:
     def __init__(self, model, config,
                 penalty_coeff=0.,
                 penalty_learned_var=False,
-                penalty_learned_var_random=False):
+                penalty_learned_var_random=False,
+                target_entropy='auto'):
         self.model = model
         self.config = config
-        self.penalty_coeff = penalty_coeff
+        self.log_penalty_coeff = tf.Variable(0.0)
+        self.alpha = tfp.util.DefferedTensor(self.log_penalty_coeff,tf.exp)
         self.penalty_learned_var = penalty_learned_var
         self.penalty_learned_var_random = penalty_learned_var_random
+        self.alpha_lr = 3e-4
+        self.alpha_optimizer = tf.optimizers.Adam(self.alpha_lr,"penalty_coeff_optimizer")
+        self.target_entropy = (
+            heuristic_target_entropy()
+            if target_entropy == 'auto'
+            else target_entropy)
+    
+    def _update_penalty_coeff(self, penalty):
+        # TODO
+        if not isinstance(self.target_entropy, Number):
+            return 0.0
+
+        with tf.GradientTape() as tape:
+            penalty_coeff_losses = 1.0 * (
+                self.penalty_coeff * tf.stop_gradient(
+                    penalty + self.target_entropy)
+            )
+            penalty_coeff_loss = tf.nn.compute_average_loss(penalty_coeff_losses)
+        penalty_coeff_gradients = tape.gradient(penalty_coeff_loss, [self.log_penalty_coeff])
+        self.alpha_optimizer.apply_gradients(zip(
+            penalty_coeff_gradients,[self.log_penalty_coeff]))
+        
+        return penalty_coeff_losses
+
+
+        # with tf.GradientTape() as tape:
 
     '''
         x : [ batch_size, obs_dim + 1 ]
@@ -97,6 +131,7 @@ class FakeEnv:
             assert penalty.shape == rewards.shape
             unpenalized_rewards = rewards
             penalized_rewards = rewards - self.penalty_coeff * penalty
+            # self.penalty_coeff = self.penalty_coeff - 
         else:
             penalty = None
             unpenalized_rewards = rewards
